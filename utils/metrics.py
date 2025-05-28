@@ -12,12 +12,14 @@ def mpjpe_error(pred, gt, *args):
     return dist[index], indexs
 
 def compute_diversity(pred, *args):
+    '''
+    pred: [50, 100, 48]
+    '''
     if pred.shape[0] == 1:
         return 0.0
-    dist = pdist(pred.reshape(pred.shape[0], -1))
+    dist = pdist(pred.reshape(pred.shape[0], -1)) # pairwise distance
     diversity = dist.mean().item()
     return diversity, None
-
 
 def compute_ade(pred, gt, *args):
     indexs = np.zeros(pred.shape[0])
@@ -26,7 +28,6 @@ def compute_ade(pred, gt, *args):
     index = dist.argmin()
     indexs[index] += 1
     return dist[index], indexs
-
 
 def compute_fde(pred, gt, *args):
     indexs = np.zeros(pred.shape[0])

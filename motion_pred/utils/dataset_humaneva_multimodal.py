@@ -53,9 +53,6 @@ class DatasetHumanEva(Dataset):
         self.data_candi = {}
 
         for key in list(data_f.keys()):
-            # data_f[key] = dict(filter(lambda x: (self.actions == 'all' or
-            #                                      all([a in x[0] for a in self.actions]))
-            #                                     and x[1].shape[0] >= self.t_total, data_f[key].items()))
             data_f[key] = dict(filter(lambda x: (self.actions == 'all' or
                                                  any([a in x[0] for a in self.actions]))
                                                  and x[1].shape[0] >= self.t_total, data_f[key].items()))
@@ -88,24 +85,7 @@ class DatasetHumanEva(Dataset):
         fr_end = fr_start + self.t_total
         traj = seq[fr_start: fr_end]
         if n_modality > 0:
-            # margin_f = 1
-            # thre_his = 0.05
-            # thre_pred = 0.1
-            # x0 = np.copy(traj[None, ...])
-            # x0[:, :, 0] = 0
-            # # candi_tmp = util.absolute2relative(self.data_candi, parents=self.skeleton.parents(), invert=True, x0=x0)
             candi_tmp = self.data_candi[subject]
-            # # observation distance
-            # dist_his = np.mean(np.linalg.norm(x0[:, self.t_his - margin_f:self.t_his, 1:] -
-            #                                   candi_tmp[:, self.t_his - margin_f:self.t_his, 1:], axis=3), axis=(1, 2))
-            # idx_his = np.where(dist_his <= thre_his)[0]
-            #
-            # # future distance
-            # dist_pred = np.mean(np.linalg.norm(x0[:, self.t_his:, 1:] -
-            #                                    candi_tmp[idx_his, self.t_his:, 1:], axis=3), axis=(1, 2))
-            #
-            # idx_pred = np.where(dist_pred >= thre_pred)[0]
-            # # idxs = np.intersect1d(idx_his, idx_pred)
             idx_multi = self.data_multimodal[subject][action][fr_start]
             traj_multi = candi_tmp[idx_multi]
 
@@ -119,8 +99,6 @@ class DatasetHumanEva(Dataset):
                 dist_his = np.mean(np.linalg.norm(x0[:, self.t_his - margin_f:self.t_his, 1:] -
                                                   traj_multi[:, self.t_his - margin_f:self.t_his, 1:], axis=3),
                                    axis=(1, 2))
-                # if np.any(dist_his > thre_his):
-                #     print(f'===> wrong multi modality sequneces {dist_his[dist_his > thre_his].max():.3f}')
 
             if len(traj_multi) > 0:
                 traj_multi[:, :self.t_his] = traj[None, ...][:, :self.t_his]
@@ -148,52 +126,6 @@ class DatasetHumanEva(Dataset):
             sample = np.concatenate(sample, axis=0)
             sample_multi = np.concatenate(sample_multi, axis=0)
             yield sample, sample_multi
-
-    #
-    # def iter_generator(self, step=25, n_modality=10):
-    #     for sub in self.data.keys():
-    #         data_s = self.data[sub]
-    #         candi_tmp = self.data_candi[sub]
-    #         for act in data_s.keys():
-    #             seq = data_s[act]
-    #             seq_len = seq.shape[0]
-    #             for i in range(0, seq_len - self.t_total, step):
-    #                 # idx_multi = self.data_multimodal[sub][act][i]
-    #                 # traj_multi = candi_tmp[idx_multi]
-    #                 traj = seq[None, i: i + self.t_total]
-    #                 if n_modality > 0:
-    #                     margin_f = 1
-    #                     thre_his = 0.05
-    #                     thre_pred = 0.1
-    #                     x0 = np.copy(traj)
-    #                     x0[:, :, 0] = 0
-    #                     # candi_tmp = util.absolute2relative(self.data_candi, parents=self.skeleton.parents(), invert=True, x0=x0)
-    #                     # candi_tmp = self.data_candi[subject]
-    #                     # observation distance
-    #                     dist_his = np.mean(np.linalg.norm(x0[:, self.t_his - margin_f:self.t_his, 1:] -
-    #                                                       candi_tmp[:, self.t_his - margin_f:self.t_his, 1:], axis=3),
-    #                                        axis=(1, 2))
-    #                     idx_his = np.where(dist_his <= thre_his)[0]
-    #
-    #                     # future distance
-    #                     dist_pred = np.mean(np.linalg.norm(x0[:, self.t_his:, 1:] -
-    #                                                        candi_tmp[idx_his, self.t_his:, 1:], axis=3), axis=(1, 2))
-    #
-    #                     idx_pred = np.where(dist_pred >= thre_pred)[0]
-    #                     # idxs = np.intersect1d(idx_his, idx_pred)
-    #                     traj_multi = candi_tmp[idx_his[idx_pred]]
-    #                     if len(traj_multi) > 0:
-    #                         traj_multi[:, :self.t_his] = traj[:, :self.t_his]
-    #                         if traj_multi.shape[0] > n_modality:
-    #                             idxtmp = np.random.choice(np.arange(traj_multi.shape[0]), n_modality, replace=False)
-    #                             traj_multi = traj_multi[idxtmp]
-    #                     traj_multi = np.concatenate(
-    #                         [traj_multi, np.zeros_like(traj[[0] * (n_modality - traj_multi.shape[0])])],
-    #                         axis=0)
-    #                 else:
-    #                     traj_multi = None
-    #
-    #                 yield traj, traj_multi
 
     def iter_generator(self, step=25):
         for data_s in self.data.values():

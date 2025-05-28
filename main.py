@@ -337,8 +337,8 @@ def visualize():
 
             poses = {'action': action, 'context': gt, 'gt': gt}
             with torch.no_grad():
-                pred = get_prediction(data, model, 1)[0]
-                pred = post_process(pred, data)
+                pred = get_prediction(data, model, 1)[0] # [50, 125, 48]
+                pred = post_process(pred, data) # [50, 125, 17, 3]
                 for i in range(pred.shape[0]):
                     poses[f'{i}'] = pred[i]
 

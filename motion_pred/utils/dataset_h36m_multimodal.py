@@ -8,6 +8,13 @@ from utils import util
 class DatasetH36M(Dataset):
 
     def __init__(self, mode, t_his=25, t_pred=100, actions='all', use_vel=False, **kwargs):
+        '''
+        mode: 'train' or 'test'
+        t_his: length of history sequence
+        t_pred: length of prediction sequence
+        actions: list of actions to include, or 'all' for all actions
+        use_vel: whether to include velocity in the trajectory
+        '''
         self.use_vel = use_vel
         if 'multimodal_path' in kwargs.keys():
             self.multimodal_path = kwargs['multimodal_path']
@@ -32,13 +39,16 @@ class DatasetH36M(Dataset):
                                  joints_left=[6, 7, 8, 9, 10, 16, 17, 18, 19, 20, 21, 22, 23],
                                  joints_right=[1, 2, 3, 4, 5, 24, 25, 26, 27, 28, 29, 30, 31])
         self.removed_joints = {4, 5, 9, 10, 11, 16, 20, 21, 22, 23, 24, 28, 29, 30, 31}
-        self.kept_joints = np.array([x for x in range(32) if x not in self.removed_joints])
+        self.kept_joints = np.array([x for x in range(32) if x not in self.removed_joints]) # 17 joints
         self.skeleton.remove_joints(self.removed_joints)
         self.skeleton._parents[11] = 8
         self.skeleton._parents[14] = 8
         self.process_data()
 
     def process_data(self):
+        '''
+        data_o: {'S1': {'Directions': [N, 32, 3], 'Actions': [N, 32, 3], ...}, ...}
+        '''
         data_o = np.load(self.data_file, allow_pickle=True)['positions_3d'].item()
         self.S1_skeleton = data_o['S1']['Directions'][:1, self.kept_joints].copy()
         data_f = dict(filter(lambda x: x[0] in self.subjects, data_o.items()))
@@ -49,9 +59,7 @@ class DatasetH36M(Dataset):
                 data_f[key] = dict(filter(lambda x: any([a in str.lower(x[0]) for a in self.actions]), data_f[key].items()))
                 if len(data_f[key]) == 0:
                     data_f.pop(key)
-        # possible candidate
-        # skip_rate = 10
-        # data_candi = []
+
         if self.multimodal_path is None:
             self.data_multimodal = \
                 np.load('./data/data_multi_modal/t_his25_1_thre0.050_t_pred100_thre0.100_filtered.npz',
@@ -75,16 +83,6 @@ class DatasetH36M(Dataset):
                     v = np.append(v, v[[-1]], axis=0)
                 seq[:, 1:] -= seq[:, :1]
 
-                # # get relative candidate
-                # data_tmp = np.copy(seq)
-                # data_tmp[:, 0] = 0
-                # nf = data_tmp.shape[0]
-                # idxs = np.arange(0, nf - self.t_his - self.t_pred, skip_rate)[:, None] + np.arange(
-                #     self.t_his + self.t_pred)[None, :]
-                # data_tmp = data_tmp[idxs]
-                # data_tmp = util.absolute2relative(data_tmp, parents=self.skeleton.parents())
-                # data_candi.append(data_tmp)
-
                 if self.use_vel:
                     seq = np.concatenate((seq, v), axis=1)
                 data_s[action] = seq
@@ -95,6 +93,7 @@ class DatasetH36M(Dataset):
                     self.data_candi[sub] = util.absolute2relative(data_candi, parents=self.skeleton.parents(),
                                                                   invert=True, x0=x0)
 
+        # self.data_candi: [18627, 125, 17, 3]
         self.data = data_f
         # self.data_candi = np.concatenate(data_candi, axis=0)
 
@@ -107,40 +106,12 @@ class DatasetH36M(Dataset):
         fr_end = fr_start + self.t_total
         traj = seq[fr_start: fr_end]
         if n_modality > 0 and subject in self.data_multimodal.keys():
-            # margin_f = 1
-            # thre_his = 0.05
-            # thre_pred = 0.1
-            # x0 = np.copy(traj[None, ...])
-            # x0[:, :, 0] = 0
-            # # candi_tmp = util.absolute2relative(self.data_candi, parents=self.skeleton.parents(), invert=True, x0=x0)
             candi_tmp = self.data_candi[subject]
-            # # observation distance
-            # dist_his = np.mean(np.linalg.norm(x0[:, self.t_his - margin_f:self.t_his, 1:] -
-            #                                   candi_tmp[:, self.t_his - margin_f:self.t_his, 1:], axis=3), axis=(1, 2))
-            # idx_his = np.where(dist_his <= thre_his)[0]
-            #
-            # # future distance
-            # dist_pred = np.mean(np.linalg.norm(x0[:, self.t_his:, 1:] -
-            #                                    candi_tmp[idx_his, self.t_his:, 1:], axis=3), axis=(1, 2))
-            #
-            # idx_pred = np.where(dist_pred >= thre_pred)[0]
-            # # idxs = np.intersect1d(idx_his, idx_pred)
+            
             idx_multi = self.data_multimodal[subject][action][fr_start]
             traj_multi = candi_tmp[idx_multi]
 
             # # confirm if it is the right one
-            # if len(idx_multi) > 0:
-            #     margin_f = 1
-            #     thre_his = 0.05
-            #     thre_pred = 0.1
-            #     x0 = np.copy(traj[None, ...])
-            #     x0[:, :, 0] = 0
-            #     dist_his = np.mean(np.linalg.norm(x0[:, self.t_his - margin_f:self.t_his, 1:] -
-            #                                       traj_multi[:, self.t_his - margin_f:self.t_his, 1:], axis=3),
-            #                        axis=(1, 2))
-            #     if np.any(dist_his > thre_his):
-            #         print(f'===> wrong multi modality sequneces {dist_his[dist_his > thre_his].max():.3f}')
-
             if len(traj_multi) > 0:
                 traj_multi[:, :self.t_his] = traj[None, ...][:, :self.t_his]
                 if traj_multi.shape[0] > n_modality:
@@ -176,18 +147,16 @@ class DatasetH36M(Dataset):
                 seq = data_s[act]
                 seq_len = seq.shape[0]
                 for i in range(0, seq_len - self.t_total, step):
-                    # idx_multi = self.data_multimodal[sub][act][i]
-                    # traj_multi = candi_tmp[idx_multi]
                     traj = seq[None, i: i + self.t_total]
+                    
+                    # multimodal candidate matching
                     if n_modality > 0:
                         margin_f = 1
                         thre_his = 0.05
                         thre_pred = 0.1
                         x0 = np.copy(traj)
                         x0[:, :, 0] = 0
-                        # candi_tmp = util.absolute2relative(self.data_candi, parents=self.skeleton.parents(), invert=True, x0=x0)
-                        # candi_tmp = self.data_candi[subject]
-                        # observation distance
+
                         dist_his = np.mean(np.linalg.norm(x0[:, self.t_his - margin_f:self.t_his, 1:] -
                                                           candi_tmp[:, self.t_his - margin_f:self.t_his, 1:], axis=3),
                                            axis=(1, 2))
@@ -212,6 +181,7 @@ class DatasetH36M(Dataset):
                     else:
                         traj_multi = None
 
+                    # traj: [1, t_total, J, 3] traj_multi: [n_modality, t_total, J, 3]
                     yield traj, traj_multi
 
 
